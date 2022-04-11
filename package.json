@@ -1,0 +1,32 @@
+{
+  "name": "hardhat-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "accounts": "npx hardhat accounts",
+    "compile": "npx hardhat compile",
+    "clean": "npx hardhat clean",
+    "test": "npx hardhat test",
+    "node": "npx hardhat node",
+    "sample-script": "node scripts/sample-script.js",
+    "help": "npx hardhat help"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@openzeppelin/hardhat-upgrades": "^1.14.0",
+    "chai": "^4.3.4",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.5.2",
+    "mocha": "^9.1.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.5.0",
+    "@openzeppelin/upgrades": "^2.8.0",
+    "hardhat": "^2.8.4",
+    "solc": "^0.8.11"
+  }
+}
