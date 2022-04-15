@@ -5,7 +5,6 @@ import {BuildingAttribute, BuildingConfig, BuildingFunctionType} from "./buildin
 import {Hero} from "./hero.sol";
 import {Item} from "./item.sol";
 import {IERC20} from "./IERC20.sol";
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 contract Building is Initializable {
@@ -51,10 +50,6 @@ contract Building is Initializable {
         public pledgeCoinRuleChangeTimestamp;
     mapping(address => mapping(uint256 => uint256)) public pledgeWeeks;
     mapping(address => mapping(uint256 => uint256)) public pledgeCoins;
-
-    //owner summoner
-    mapping(address => mapping(uint256 => EconomyRecord[]))
-        public summonerAwardHistory;
     uint256 public totoalPledgedCroesus;
 
     event BuildingCreated(address indexed owner, uint256 buildingId);
@@ -201,60 +196,6 @@ contract Building is Initializable {
         croesus.transferFrom(sender, wallet, (amount * 80) / 100);
     }
 
-    function pledgeCoin(
-        uint256 _buildingId,
-        uint256 _weeks,
-        uint256 _coins
-    ) public {
-        require(
-            ownedBuildings[msg.sender][_buildingId],
-            "Building: Unknown building."
-        );
-        require(
-            _weeks <= 24 && _weeks > 0,
-            "Building: Lock period is between 1 and 24 weeks."
-        );
-        require(_coins > 0, "Building: Locking amount must be greater than 0.");
-        uint256 lastTimestamp = pledgeCoinRuleChangeTimestamp[msg.sender][
-            _buildingId
-        ];
-        require(lastTimestamp == 0, "Building: Already locked.");
-        BuildingAttribute memory buildingAttr = bc.buildingById(_buildingId);
-        require(
-            buildingAttr.pledgeLimit >= _coins,
-            "Building: Amount of COSS exceeds building limit."
-        );
-        croesus.transferFrom(msg.sender, wallet, _coins * 1e18);
-        totoalPledgedCroesus += _coins * 1e18;
-        pledgeCoinRuleChangeTimestamp[msg.sender][_buildingId] = block
-            .timestamp;
-        pledgeWeeks[msg.sender][_buildingId] = _weeks;
-        pledgeCoins[msg.sender][_buildingId] = _coins;
-        uint256 armyStorageLimit;
-        uint256 armyProduceRate;
-        if (buildingAttr.functionType == BuildingFunctionType.Army) {
-            (
-                armyStorageLimit,
-                armyProduceRate
-            ) = _calcArmyBuildingProduceRateAndStorageLimit(
-                _weeks,
-                _coins,
-                buildingAttr,
-                block.timestamp
-            );
-        }
-        emit PledgeCoinRuleChanged(
-            msg.sender,
-            _buildingId,
-            _weeks,
-            _coins,
-            block.timestamp,
-            buildingAttr.functionType,
-            armyStorageLimit,
-            armyProduceRate
-        );
-    }
-
     function getArmyBuildingProduceRateAndStorageLimit(
         address _owner,
         uint256 _buildingId
@@ -366,14 +307,6 @@ contract Building is Initializable {
         emit CrystalMuiltReceived(msg.sender, totalAmount);
     }
 
-    function receiveCrystal(uint256 _buildingId) external {
-        uint256 totalAmount = _prepareRecieveCrystal(_buildingId);
-        if (totalAmount > 0) {
-            crystal.mint(msg.sender, totalAmount);
-        }
-        emit CrystalReceived(msg.sender, totalAmount, _buildingId);
-    }
-
     function _prepareRecieveCrystal(uint256 _buildingId)
         private
         returns (uint256 amount)
@@ -391,7 +324,6 @@ contract Building is Initializable {
         for (uint256 index = 0; index < pledgeSummoners.length; index++) {
             uint256 _summoner = pledgeSummoners[index];
             uint256 currentAward = getCurrentAward(_summoner);
-            _recordEconomyHistory(_summoner, currentAward);
             amount += currentAward;
             summonerLastCountAward[_summoner] = 0;
             summonerLastCountTimestamp[_summoner] = block.timestamp;
@@ -493,7 +425,6 @@ contract Building is Initializable {
             for (uint256 index = 0; index < pledgeSummoners.length; index++) {
                 uint256 _summoner = pledgeSummoners[index];
                 uint256 currentAward = getCurrentAward(_summoner);
-                _recordEconomyHistory(_summoner, currentAward);
                 summonerLastCountAward[_summoner] = currentAward;
                 summonerLastCountTimestamp[_summoner] = block.timestamp;
             }
@@ -609,36 +540,6 @@ contract Building is Initializable {
         return (_weeks * _coins * 10**(decimals / 2)) / (5000 * 24);
     }
 
-    function _recordEconomyHistory(uint256 _summoner, uint256 currentAward)
-        private
-    {
-        uint256 lastAward = summonerLastCountAward[_summoner];
-        uint256 award = currentAward - lastAward;
-        if (award > 0) {
-            address _owner = tx.origin;
-            EconomyRecord[] storage history = summonerAwardHistory[_owner][
-                _summoner
-            ];
-            uint256 _buildingId = summonerPledgeBuildingId[_summoner];
-
-            uint256 pledgeStartTimestamp = summonerPledgeTimestamp[_summoner];
-            history.push(
-                EconomyRecord(
-                    _buildingId,
-                    pledgeStartTimestamp,
-                    summonerLastRecieveAwardTimestamp[_summoner],
-                    summonerLastCountTimestamp[_summoner],
-                    block.timestamp,
-                    currentAward - lastAward,
-                    block.timestamp,
-                    pledgeCoinRuleChangeTimestamp[_owner][_buildingId],
-                    pledgeWeeks[_owner][_buildingId],
-                    pledgeCoins[_owner][_buildingId]
-                )
-            );
-        }
-    }
-
     function pledgeHero(uint256 _buildingId, uint256 _summoner) public {
         require(
             ownedBuildings[tx.origin][_buildingId],
@@ -704,7 +605,6 @@ contract Building is Initializable {
             "Building: Not the hero's owner."
         );
         uint256 currentAward = getCurrentAward(_summoner);
-        _recordEconomyHistory(_summoner, currentAward);
         if (currentAward > 0) {
             crystal.mint(tx.origin, currentAward);
         }
@@ -724,36 +624,6 @@ contract Building is Initializable {
         for (uint256 index = 0; index < _summoners.length; index++) {
             uint256 _summoner = _summoners[index];
             redeemHero(_summoner);
-        }
-    }
-
-    function getSummonerAwardHistory(
-        address _owner,
-        uint256 _summoner,
-        uint256 page,
-        uint256 size
-    )
-        external
-        view
-        returns (
-            bool hasNext,
-            uint256 total,
-            EconomyRecord[] memory list
-        )
-    {
-        EconomyRecord[] storage history = summonerAwardHistory[_owner][
-            _summoner
-        ];
-        if (size > 50) {
-            size = 50;
-        }
-        total = history.length;
-        hasNext = total > (page + 1) * size;
-        uint256 currentPageSize = hasNext ? size : total - page * size;
-        uint256 start = page * size;
-        list = new EconomyRecord[](currentPageSize);
-        for (uint256 index = 0; index < currentPageSize; index++) {
-            list[index] = history[start + index];
         }
     }
 
@@ -785,28 +655,6 @@ contract Building is Initializable {
         address owner;
         uint256 buildingId;
         uint256[] summoners;
-    }
-
-    function getEconomyBuildingPledgeSummoners(address _owner)
-        external
-        view
-        returns (BuildingPledgeSummoners[] memory)
-    {
-        mapping(uint256 => uint256[]) storage ids = pledgeIds[_owner];
-        uint256[3] memory economyBuildings = bc.getEconomyBuildingIds();
-        BuildingPledgeSummoners[] memory list = new BuildingPledgeSummoners[](
-            economyBuildings.length
-        );
-        for (uint256 index = 0; index < economyBuildings.length; index++) {
-            uint256 _buildingId = economyBuildings[index];
-            uint256[] memory summoners = ids[_buildingId];
-            list[index] = BuildingPledgeSummoners(
-                _owner,
-                _buildingId,
-                summoners
-            );
-        }
-        return list;
     }
 
     function _isApprovedOrOwnerOfSummoner(uint256 _summoner)

@@ -7,7 +7,6 @@ import {Hero} from "./hero.sol";
 import {HeroInfo} from "./hero_config.sol";
 import {IERC20} from "./IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "hardhat/console.sol";
 
 contract Item is ERC721Enumerable, Initializable {
     Hero private he;
@@ -88,12 +87,6 @@ contract Item is ERC721Enumerable, Initializable {
         uint256 itemTokenId,
         uint256 itemId,
         uint256 index
-    );
-
-    event ItemRecycled(
-        address indexed owner,
-        uint256 itemTokenId,
-        uint256 itemId
     );
 
     event ItemMerged(
@@ -273,7 +266,6 @@ contract Item is ERC721Enumerable, Initializable {
         uint256 recoveryPay = uint256(_attr.recoveryPayNumber) * 1e18;
         _burn(_item);
         crystal.mint(msg.sender, recoveryPay);
-        emit ItemRecycled(msg.sender, _item, _itemId);
     }
 
     function items(uint256[] memory _items)
@@ -357,59 +349,6 @@ contract Item is ERC721Enumerable, Initializable {
 
     function isUsing(uint256 _item) public view returns (bool) {
         return isWeared[_item];
-    }
-
-    function wearItem(
-        uint256 _summoner,
-        uint256 _item,
-        uint256 _index
-    ) public {
-        require(
-            _isApprovedOrOwnerOfSummoner(_summoner),
-            "Item: Not the hero's owner."
-        );
-        require(_isApprovedOrOwnerOfItem(_item), "Item: Wrong owner.");
-        require(
-            !he.isWorking(_summoner),
-            "Item: Hero is staked or in the battle."
-        );
-        require(!isUsing(_item), "Item: Item is in use.");
-        uint256 _itemId = itemId[_item];
-        if (_index >= 11) {
-            uint256[19] memory _wearingConfigIds = wearingItemConfigIds[
-                _summoner
-            ];
-            require(
-                !_arrayContains(_wearingConfigIds, _itemId),
-                "Item: Equip same magic scroll twice is not allowed."
-            );
-        }
-        ItemAttribute memory attr = ic.itemById(_itemId);
-        uint256 position = attr.position;
-        require(position != 0, "Item: No such item.");
-        if (position <= 7) {
-            require(_index == position - 1, "Item: Wrong slot.");
-        } else if (position == 8) {
-            require(_index < 11 && _index >= 7, "Item: Wrong slot.");
-        } else if (position == 9) {
-            require(_index < 19 && _index >= 11, "Item: Wrong slot.");
-        }
-        uint256 oldItemId = wearingItemConfigIds[_summoner][_index];
-        uint256 oldItem = wearingItemTokenIds[_summoner][_index];
-        if (oldItemId > 0) {
-            require(
-                wearedTimestamp[oldItem] < block.timestamp - 12 hours,
-                "Item: Can be removed after 12 hours."
-            );
-            isWeared[oldItem] = false;
-            emit ItemRemoved(msg.sender, _summoner, oldItem, oldItemId, _index);
-        }
-        wearingItemConfigIds[_summoner][_index] = _itemId;
-        wearingItemTokenIds[_summoner][_index] = _item;
-        isWeared[_item] = true;
-        wearedTimestamp[_item] = block.timestamp;
-        wearedSummoner[_item] = _summoner;
-        emit ItemWeared(msg.sender, _summoner, _item, _itemId, _index);
     }
 
     function _removeItem(
@@ -496,25 +435,6 @@ contract Item is ERC721Enumerable, Initializable {
         }
     }
 
-    function removeItem(uint256 _summoner, uint256 index) external {
-        require(
-            _isApprovedOrOwnerOfSummoner(_summoner),
-            "Item: Not the hero's owner."
-        );
-        isWeared[wearingItemTokenIds[_summoner][index]] = false;
-        uint256 _itemId = wearingItemConfigIds[_summoner][index];
-        uint256 _item = wearingItemTokenIds[_summoner][index];
-        require(
-            wearedTimestamp[_item] < block.timestamp - 12 hours,
-            "Item: Can be removed after 12 hours."
-        );
-        wearingItemConfigIds[_summoner][index] = 0;
-        wearingItemTokenIds[_summoner][index] = 0;
-        wearedTimestamp[_item] = 0;
-        wearedSummoner[_item] = 0;
-        emit ItemRemoved(msg.sender, _summoner, _item, _itemId, index);
-    }
-
     function removeAllExpiredItems(uint256 _summoner) external {
         require(
             _isApprovedOrOwnerOfSummoner(_summoner),
@@ -540,15 +460,6 @@ contract Item is ERC721Enumerable, Initializable {
                 }
             }
         }
-        emit ItemsCleared(msg.sender, _summoner);
-    }
-
-    function removeWearingItems(uint256 _summoner) external {
-        require(
-            _isApprovedOrOwnerOfSummoner(_summoner),
-            "Item: Not the hero's owner."
-        );
-        _clearWearingItems(_summoner);
         emit ItemsCleared(msg.sender, _summoner);
     }
 
@@ -719,16 +630,21 @@ contract Item is ERC721Enumerable, Initializable {
 
     function tokenURI(uint256 _tokenId) external view returns (string memory) {
         require(_exists(_tokenId), "Item: This item does not exist.");
-        bytes memory tokenIdBytes = toBytes(_tokenId);
-        bytes memory hostBytes = "https://www.undoomed.space/item/";
-        bytes memory buffer = new bytes(hostBytes.length + tokenIdBytes.length);
-        for (uint256 i = 0; i < hostBytes.length; i++) {
-            buffer[i] = hostBytes[i];
-        }
-        for (uint256 i = 0; i < buffer.length - hostBytes.length; i++) {
-            buffer[i + hostBytes.length] = tokenIdBytes[i];
-        }
-        return string(buffer);
+        return
+            string(
+                abi.encodePacked(
+                    "https://www.undoomed.space/item/",
+                    toBytes(_tokenId),
+                    "?n=",
+                    itemName[_tokenId],
+                    "&t=",
+                    toBytes(itemType[_tokenId]),
+                    "&l=",
+                    toBytes(level[_tokenId]),
+                    "&i=",
+                    toBytes(itemId[_tokenId])
+                )
+            );
     }
 
     function toBytes(uint256 value) internal pure returns (bytes memory) {

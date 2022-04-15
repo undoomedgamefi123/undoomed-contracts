@@ -7,7 +7,6 @@ import {Item} from "./item.sol";
 import {IERC20} from "./IERC20.sol";
 import {UpgradeAttribute, HeroConfig} from "./hero_config.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "hardhat/console.sol";
 
 struct AdventureArmy {
     uint256 id;
@@ -116,6 +115,7 @@ contract Adventure is Initializable {
     event RankingUsdtAwardRecieved(address indexed owner, uint256 amount);
     event DailyRankingPublished(uint256 timestampDay);
     event WeeklyRankingPublished(uint256 timestampWeek);
+    event DailyCroesusMinted(uint256 timestampDay);
 
     function initialize(
         address _heAddr,
@@ -846,6 +846,7 @@ contract Adventure is Initializable {
         croesus.mint(address(this), amount1);
         dailyTotalOutput[timestampDay] = amount1;
         dailyMinted[timestampDay] = true;
+        emit DailyCroesusMinted(timestampDay);
     }
 
     function _isCoresusMinter() private view returns (bool) {

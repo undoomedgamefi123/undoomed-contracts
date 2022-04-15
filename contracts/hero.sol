@@ -5,7 +5,6 @@ import {ERC721Enumerable} from "./erc721.sol";
 import {PubConfig, HeroInfo, UpgradeAttribute, HeroConfig, AbilityScore} from "./hero_config.sol";
 import {IERC20} from "./IERC20.sol";
 import {Item} from "./item.sol";
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 contract Hero is ERC721Enumerable, Initializable {
@@ -54,7 +53,6 @@ contract Hero is ERC721Enumerable, Initializable {
     );
     event leveled(address indexed owner, uint256 level, uint256 summoner);
     event levelFailed(address indexed owner, uint256 level, uint256 summoner);
-    event SummonerRecycled(address indexed owner, uint256 summoner);
     event SummonersNameChanged(
         uint256 summoner,
         string oldName,
@@ -164,7 +162,6 @@ contract Hero is ERC721Enumerable, Initializable {
         uint256 recoveryPay = _upgrade_attribute.recoveryPay * 1e18;
         _burn(_summoner);
         crystal.mint(msg.sender, recoveryPay);
-        emit SummonerRecycled(msg.sender, _summoner);
     }
 
     function isWorking(uint256 _summoner) public view returns (bool) {
@@ -499,16 +496,31 @@ contract Hero is ERC721Enumerable, Initializable {
 
     function tokenURI(uint256 _tokenId) external view returns (string memory) {
         require(_exists(_tokenId), "Hero: This hero does not exist.");
-        bytes memory tokenIdBytes = toBytes(_tokenId);
-        bytes memory hostBytes = "https://www.undoomed.space/hero/";
-        bytes memory buffer = new bytes(hostBytes.length + tokenIdBytes.length);
-        for (uint256 i = 0; i < hostBytes.length; i++) {
-            buffer[i] = hostBytes[i];
-        }
-        for (uint256 i = 0; i < buffer.length - hostBytes.length; i++) {
-            buffer[i + hostBytes.length] = tokenIdBytes[i];
-        }
-        return string(buffer);
+        return
+            string(
+                abi.encodePacked(
+                    "https://www.undoomed.space/hero/",
+                    toBytes(_tokenId),
+                    "?n=",
+                    heroName[_tokenId],
+                    "&l=",
+                    toBytes(level[_tokenId]),
+                    "&q=",
+                    toBytes(quality[_tokenId]),
+                    "&a=",
+                    toBytes(atkValue[_tokenId]),
+                    abi.encodePacked(
+                        "&s=",
+                        toBytes(atkSpeed[_tokenId]),
+                        "&i=",
+                        toBytes(magicValue[_tokenId]),
+                        "&o=",
+                        toBytes(occupation[_tokenId]),
+                        "&m=",
+                        toBytes(model[_tokenId])
+                    )
+                )
+            );
     }
 
     function toBytes(uint256 value) internal pure returns (bytes memory) {
