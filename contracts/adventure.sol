@@ -2,7 +2,6 @@
 pragma solidity ^0.8.7;
 
 import {Hero} from "./hero.sol";
-import {MapConfig} from "./map_config.sol";
 import {Item} from "./item.sol";
 import {IERC20} from "./IERC20.sol";
 import {UpgradeAttribute, HeroConfig} from "./hero_config.sol";
